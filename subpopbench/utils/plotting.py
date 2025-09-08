@@ -36,79 +36,29 @@ def plots_dir() -> Path:
     return p
 
 
-def _coerce_figure(fig_or_ax: Optional[FigureLike]):
-    import matplotlib.pyplot as plt
-    from matplotlib.axes import Axes  # type: ignore
-    from matplotlib.figure import Figure  # type: ignore
-
-    if fig_or_ax is None:
-        return plt.gcf()
-    if isinstance(fig_or_ax, Figure):
-        return fig_or_ax
-    if isinstance(fig_or_ax, Axes):
-        return fig_or_ax.get_figure()
-    raise TypeError("Expected Figure, Axes, or None; got %r" % (type(fig_or_ax),))
-
-
-def savefig(
-    filename: str,
-    fig: Optional[FigureLike] = None,
-    subdir: Optional[str] = None,
-    dpi: int = 300,
-    tight: bool = True,
-    overwrite: bool = False,
-    verbose: bool = True,
-    **savefig_kwargs,
-) -> Path:
-    """Save a matplotlib figure into plots/ (optionally a subdir) and return its path.
-
-    Parameters
-    ----------
-    filename : str
-        Target file name. Extension determines format (e.g. .png, .pdf, .svg).
-    fig : Figure | Axes | None
-        Figure or Axes to save. If None, uses current active figure.
-    subdir : str | None
-        Optional subfolder inside plots/.
-    dpi : int
-        Resolution.
-    tight : bool
-        Apply bbox_inches='tight' to reduce whitespace.
-    overwrite : bool
-        If False and file exists, append an incrementing suffix before the extension.
-    verbose : bool
-        Print resulting path when saved.
-    **savefig_kwargs : dict
-        Forwarded to matplotlib Figure.savefig.
+def savefig(filename: str, fig: Optional[FigureLike] = None, **savefig_kwargs):
     """
-    base = plots_dir()
-    if subdir:
-        base = base / subdir
-        base.mkdir(parents=True, exist_ok=True)
+    Directly save a matplotlib figure using the native savefig function.
+    Parameters:
+        filename: str, path to save the figure (can include folders)
+        fig: Figure or Axes or None (if None, uses current active figure)
+        **savefig_kwargs: passed to matplotlib's savefig
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
-    # Ensure extension exists; default to .png
-    path = Path(filename)
-    if path.suffix == "":
-        path = path.with_suffix(".png")
-
-    dest = base / path.name
-
-    if not overwrite:
-        stem, suffix = dest.stem, dest.suffix
-        counter = 1
-        while dest.exists():
-            dest = base / f"{stem}_{counter}{suffix}"
-            counter += 1
-
-    fig_obj = _coerce_figure(fig)
-
-    save_args = dict(dpi=dpi, **savefig_kwargs)
-    if tight:
-        save_args.setdefault("bbox_inches", "tight")
-    fig_obj.savefig(dest, **save_args)
-    if verbose:
-        print(f"[savefig] Saved figure to {dest.relative_to(_project_root())}")
-    return dest
+    if fig is None:
+        fig_obj = plt.gcf()
+    elif isinstance(fig, Figure):
+        fig_obj = fig
+    elif isinstance(fig, Axes):
+        fig_obj = fig.get_figure()
+    else:
+        raise TypeError(f"Expected Figure, Axes, or None; got {type(fig)}")
+    fig_obj.savefig(filename, **savefig_kwargs)
+    print(f"[savefig] Saved figure to {filename}")
+    return filename
 
 
 __all__ = ["savefig", "plots_dir"]

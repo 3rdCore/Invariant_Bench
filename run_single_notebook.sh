@@ -12,14 +12,11 @@
 module load python/3.9
 module load cuda/11.8
 
-# Activate your conda environment if needed
-# conda activate your_env_name
-
 # Change to the project directory
 cd /home/mila/t/tom.marty/invariant_bench/SubpopBench/
 
 source ../XRM/.venv/bin/activate
 # Run the notebook conversion command
-jupyter nbconvert --to notebook --execute subpopbench/pcl.ipynb --output executed_notebook_1.ipynb
+jupyter nbconvert --to notebook --execute subpopbench/pcl.ipynb --output executed_notebook.ipynb
 
 echo "Notebook execution completed!"
