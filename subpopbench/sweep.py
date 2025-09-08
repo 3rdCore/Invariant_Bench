@@ -1,11 +1,11 @@
 import argparse
 import copy
 import os
+import shlex
 import shutil
+
 import numpy as np
 import tqdm
-import shlex
-
 from subpopbench import command_launchers
 from subpopbench.dataset import datasets
 from subpopbench.learning import algorithms, model_selection

@@ -3,6 +3,7 @@ import torch
 
 class _InfiniteSampler(torch.utils.data.Sampler):
     """Wraps another Sampler to yield an infinite stream."""
+
     def __init__(self, sampler):
         self.sampler = sampler
 
@@ -13,53 +14,59 @@ class _InfiniteSampler(torch.utils.data.Sampler):
 
 
 class InfiniteDataLoader:
-
     def __init__(self, dataset, weights, batch_size, num_workers):
         super().__init__()
 
         if weights is not None:
             sampler = torch.utils.data.WeightedRandomSampler(
-                weights, replacement=True, num_samples=batch_size)
+                weights, replacement=True, num_samples=len(dataset)
+            )
         else:
             sampler = torch.utils.data.RandomSampler(dataset, replacement=True)
 
         batch_sampler = torch.utils.data.BatchSampler(
-            sampler,
-            batch_size=batch_size,
-            drop_last=True)
+            sampler, batch_size=batch_size, drop_last=True
+        )
 
-        self._infinite_iterator = iter(torch.utils.data.DataLoader(
-            dataset,
-            num_workers=num_workers,
-            batch_sampler=_InfiniteSampler(batch_sampler)
-        ))
+        self.dataloader = torch.utils.data.DataLoader(
+            dataset, num_workers=num_workers, batch_sampler=batch_sampler
+        )
+        self.iterator = iter(self.dataloader)
 
     def __iter__(self):
         while True:
-            yield next(self._infinite_iterator)
+            try:
+                batch = next(self.iterator)
+            except StopIteration:
+                self.iterator = iter(self.dataloader)
+                continue  # retry loop instead of yielding here
+            yield batch
 
     def __len__(self):
-        raise ValueError
+        return len(self.dataloader)
 
 
 class FastDataLoader:
     """
     DataLoader wrapper with slightly improved speed by not respawning worker processes at every epoch
     """
+
     def __init__(self, dataset, batch_size, num_workers):
         super().__init__()
 
         batch_sampler = torch.utils.data.BatchSampler(
             torch.utils.data.RandomSampler(dataset, replacement=False),
             batch_size=batch_size,
-            drop_last=False
+            drop_last=False,
         )
 
-        self._infinite_iterator = iter(torch.utils.data.DataLoader(
-            dataset,
-            num_workers=num_workers,
-            batch_sampler=_InfiniteSampler(batch_sampler)
-        ))
+        self._infinite_iterator = iter(
+            torch.utils.data.DataLoader(
+                dataset,
+                num_workers=num_workers,
+                batch_sampler=_InfiniteSampler(batch_sampler),
+            )
+        )
 
         self._length = len(batch_sampler)
         self.dataset = dataset

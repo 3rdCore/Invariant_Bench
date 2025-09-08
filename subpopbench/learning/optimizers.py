@@ -1,5 +1,5 @@
 import torch
-from transformers import AdamW
+from torch.optim import AdamW
 
 
 def get_bert_optim(network, lr, weight_decay):
@@ -22,22 +22,14 @@ def get_bert_optim(network, lr, weight_decay):
             "weight_decay": 0.0,
         },
     ]
-    optimizer = AdamW(
-        optimizer_grouped_parameters,
-        lr=lr,
-        eps=1e-8)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=1e-8)
     return optimizer
 
 
 def get_sgd_optim(network, lr, weight_decay):
     return torch.optim.SGD(
-        network.parameters(),
-        lr=lr,
-        weight_decay=weight_decay,
-        momentum=0.9)
+        network.parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9
+    )
 
 
-get_optimizers = {
-    "sgd": get_sgd_optim,
-    "adamw": get_bert_optim
-}
+get_optimizers = {"sgd": get_sgd_optim, "adamw": get_bert_optim}
