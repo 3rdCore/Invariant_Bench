@@ -96,83 +96,6 @@ def group_counts(ds, name="dataset", max_items=None):
     return attr_counter, label_counter, pair_counter
 
 
-# --- Utility functions for robust error handling ---
-import logging
-import warnings
-
-
-def safe_tensor_operation(
-    func, *args, default_value=None, error_msg="Tensor operation failed"
-):
-    """Safely execute tensor operations with error handling"""
-    try:
-        result = func(*args)
-        # Check if result contains NaN or inf
-        if hasattr(result, "isnan"):
-            if result.isnan().any() or result.isinf().any():
-                logging.warning(f"{error_msg}: Result contains NaN/inf values")
-                return default_value
-        return result
-    except Exception as e:
-        logging.warning(f"{error_msg}: {str(e)}")
-        return default_value
-
-
-def safe_model_operation(model, operation, *args, **kwargs):
-    """Safely execute model operations (forward pass, loss computation, etc.)"""
-    try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            return operation(*args, **kwargs)
-    except RuntimeError as e:
-        if "out of memory" in str(e).lower():
-            logging.error(f"CUDA out of memory during model operation: {e}")
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        else:
-            logging.error(f"Runtime error during model operation: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"Unexpected error during model operation: {e}")
-        return None
-
-
-def check_data_validity(data_tuple, expected_length=4):
-    """Check if data tuple is valid and contains expected number of elements"""
-    try:
-        if len(data_tuple) != expected_length:
-            logging.warning(
-                f"Data tuple has unexpected length: {len(data_tuple)} (expected {expected_length})"
-            )
-            return False
-        for i, item in enumerate(data_tuple):
-            if item is None:
-                logging.warning(f"Data tuple element {i} is None")
-                return False
-            # Check for tensor validity
-            if hasattr(item, "isnan"):
-                if item.isnan().any():
-                    logging.warning(f"Data tuple element {i} contains NaN values")
-                    return False
-        return True
-    except Exception as e:
-        logging.warning(f"Error checking data validity: {e}")
-        return False
-
-
-def log_error(ERROR_LOG, error_type, context, error_msg):
-    """Log errors for analysis"""
-    if error_type not in ERROR_LOG:
-        ERROR_LOG[error_type] = {}
-    key = str(context)
-    if key not in ERROR_LOG[error_type]:
-        ERROR_LOG[error_type][key] = []
-    ERROR_LOG[error_type][key].append(error_msg)
-    logging.error(f"[{error_type}] {context}: {error_msg}")
-
-
 def print_error_summary(ERROR_LOG):
     """Print summary of all errors encountered"""
     print("\n=== Error Summary ===")
@@ -336,6 +259,40 @@ class _SplitDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.keys)
+
+
+# Helper function to safely extract loss value
+def safe_extract_loss(loss_dict, default_value=float("nan")):
+    """Safely extract loss value from algorithm output"""
+    try:
+        if isinstance(loss_dict, dict):
+            if "loss" in loss_dict:
+                loss_val = loss_dict["loss"]
+            elif len(loss_dict) > 0:
+                # Try to get the first numeric value from the dict
+                loss_val = next(iter(loss_dict.values()))
+            else:
+                return default_value
+        else:
+            loss_val = loss_dict
+
+        # Convert to float and check for validity
+        loss_float = float(loss_val)
+        return loss_float if np.isfinite(loss_float) else default_value
+    except (TypeError, ValueError, AttributeError):
+        return default_value
+
+
+# Helper function to safely compute metrics
+def safe_mean(values, default_value=float("nan")):
+    """Safely compute mean, handling empty lists and NaN values"""
+    try:
+        if not values:
+            return default_value
+        valid_values = [v for v in values if np.isfinite(v)]
+        return float(np.mean(valid_values)) if valid_values else default_value
+    except (TypeError, ValueError):
+        return default_value
 
 
 def split_dataset(dataset, n, seed=0):
