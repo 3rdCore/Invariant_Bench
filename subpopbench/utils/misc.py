@@ -1,7 +1,50 @@
 # --- Stratified sampling and group helpers ---
-from collections import Counter, defaultdict
+import hashlib
+import math
+import operator
+import os
+import sys
+from collections import Counter, OrderedDict, defaultdict
+from numbers import Number
 
 import numpy as np
+import torch
+
+
+def is_running_in_vscode():
+    """Detect if we're running in VS Code environment"""
+    # Check for VS Code specific environment variables
+    vscode_indicators = [
+        "VSCODE_PID",
+        "VSCODE_IPC_HOOK",
+        "VSCODE_INJECTION",
+        "TERM_PROGRAM",
+    ]
+
+    for indicator in vscode_indicators:
+        if indicator in os.environ:
+            if indicator == "TERM_PROGRAM" and os.environ[indicator] == "vscode":
+                return True
+            elif indicator != "TERM_PROGRAM":
+                return True
+
+    # Check if we're in an interactive Jupyter environment (common in VS Code)
+    try:
+        from IPython import get_ipython
+
+        if get_ipython() is not None:
+            # Additional check for VS Code Jupyter extension
+            if hasattr(get_ipython(), "kernel"):
+                return True
+    except ImportError:
+        pass
+
+    # Check for Slurm environment variables (if present, likely not VS Code)
+    slurm_indicators = ["SLURM_JOB_ID", "SLURM_PROCID", "SLURM_TASK_PID"]
+    if any(indicator in os.environ for indicator in slurm_indicators):
+        return False
+
+    return False
 
 
 def build_group_index(ds):
@@ -110,17 +153,6 @@ def print_error_summary(ERROR_LOG):
         print("No errors encountered!")
     else:
         print(f"\nTotal errors: {total_errors}")
-
-
-import hashlib
-import math
-import operator
-import os
-import sys
-from collections import OrderedDict
-from numbers import Number
-
-import torch
 
 
 def prepare_folders(args):
