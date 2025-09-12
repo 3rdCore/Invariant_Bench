@@ -197,6 +197,37 @@ class MNIST_CNN(nn.Module):
         return x
 
 
+class SimpleMLP(nn.Module):
+    """Simple MLP as featurizer (returns features, not direct classification)"""
+
+    n_outputs = 300  # Feature output size
+
+    def __init__(self, input_shape):
+        super(SimpleMLP, self).__init__()
+        # Calculate input size based on input shape
+        input_size = input_shape[0] * input_shape[1] * input_shape[2]
+
+        self.lin1 = nn.Linear(input_size, 300)
+        self.lin2 = nn.Linear(300, 300)
+
+        # Use Xavier (Glorot) uniform initialization as specified
+        for lin in [self.lin1, self.lin2]:
+            nn.init.xavier_uniform_(lin.weight)
+            nn.init.zeros_(lin.bias)
+
+        self.relu1 = nn.ReLU()
+        self.relu2 = nn.ReLU()
+
+    def forward(self, input):
+        out = input.view(input.shape[0], -1)  # Flatten to handle any input size
+
+        out = self.lin1(out)
+        out = self.relu1(out)
+        out = self.lin2(out)
+        out = self.relu2(out)
+        return out
+
+
 class BertFeatureWrapper(torch.nn.Module):
 
     def __init__(self, model, hparams):
@@ -282,11 +313,18 @@ def Featurizer(data_type, input_shape, hparams):
         if len(input_shape) == 1:
             return MLP(input_shape[0], hparams["mlp_width"], hparams)
         elif input_shape[1:3] == (28, 28):
-            return MNIST_CNN(input_shape)
+            # Check if we should use SimpleMLP instead of MNIST_CNN
+            if hparams.get("image_arch") == "simple_mlp":
+                return SimpleMLP(input_shape)
+            else:
+                return MNIST_CNN(input_shape)
         elif input_shape[1:3] == (32, 32):
             return wide_resnet.WideResNet(input_shape, 16, 2, 0.0)
         elif input_shape[1:3] == (224, 224):
-            if hparams["image_arch"] == "resnet_sup_in1k":
+            # Check if we should use SimpleMLP for 224x224 as well
+            if hparams.get("image_arch") == "simple_mlp":
+                return SimpleMLP(input_shape)
+            elif hparams["image_arch"] == "resnet_sup_in1k":
                 return ResNet(input_shape, hparams, hparams["pretrained"])
             elif hparams["image_arch"] in [
                 "vit_sup_in1k",
