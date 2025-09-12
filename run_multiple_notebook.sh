@@ -1,15 +1,12 @@
 #!/bin/bash
-'''
+
 pairs=(
+  "0.5 0.01"
   "0.5 0.05"
   "0.5 0.1"
   "0.5 0.2"
   "0.5 0.5"
-)'''
-pairs=(
-  "0.5 0.05"
 )
-
 result_timestamp=$(date +%Y%m%d-%H%M%S)
 # Print job submission information
 echo "Results will be saved under results/${result_timestamp}/"
