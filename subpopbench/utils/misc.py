@@ -422,6 +422,15 @@ class Tee:
         self.file.flush()
 
 
+def safe_float_env(var, default):
+    """Safely get a float environment variable, with fallback to default."""
+    val = os.environ.get(var, "")
+    try:
+        return float(val) if val else default
+    except ValueError:
+        return default
+
+
 class ParamDict(OrderedDict):
     """Code adapted from https://github.com/Alok/rl_implementations/tree/master/reptile.
     A dictionary where the values are Tensors, meant to represent weights of
@@ -457,3 +466,43 @@ class ParamDict(OrderedDict):
 
     def __truediv__(self, other):
         return self._prototype(other, operator.truediv)
+
+
+class InfiniteDataLoader:
+    def __init__(self, dataset, weights, batch_size, num_workers, seed=None):
+        super().__init__()
+
+        generator = None
+        if seed is not None:
+            generator = torch.Generator()
+            generator.manual_seed(seed)
+
+        if weights is not None:
+            sampler = torch.utils.data.WeightedRandomSampler(
+                weights, replacement=True, num_samples=len(dataset), generator=generator
+            )
+        else:
+            sampler = torch.utils.data.RandomSampler(
+                dataset, replacement=True, generator=generator
+            )
+
+        batch_sampler = torch.utils.data.BatchSampler(
+            sampler, batch_size=batch_size, drop_last=False
+        )
+
+        self.dataloader = torch.utils.data.DataLoader(
+            dataset, num_workers=num_workers, batch_sampler=batch_sampler
+        )
+        self.iterator = iter(self.dataloader)
+
+    def __iter__(self):
+        while True:
+            try:
+                batch = next(self.iterator)
+            except StopIteration:
+                self.iterator = iter(self.dataloader)
+                continue  # retry loop instead of yielding here
+            yield batch
+
+    def __len__(self):
+        return len(self.dataloader)
