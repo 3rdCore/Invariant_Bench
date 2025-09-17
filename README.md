@@ -9,7 +9,7 @@ This project benchmarks invariant feature learning algorithms under varying spur
 Clone the repo and set up the Python environment (skip `uv` steps on Mila cluster):
 ```bash
 git clone https://github.com/3rdCore/Invariant_Bench.git
-cd Invariant_Bench/
+cd invariant_bench/
 uv venv .venv --python 3.12
 source .venv/bin/activate
 uv pip install -r requirements.txt
@@ -23,9 +23,9 @@ ln -s ~/scratch/invariant_bench/results ~/invariant_bench/results
 ```
 
 ### 3. Download Data
-Download datasets to scratch:
+Download datasets (e.g. cminist) to scratch:
 ```bash
-python scripts/download.py --download --data_path ~/scratch/data/benchmark cmnist
+python scripts/download.py --download --data_path ~/scratch/invariant_bench/data/benchmark cmnist
 ```
 
 ## Workflow
@@ -34,7 +34,7 @@ python scripts/download.py --download --data_path ~/scratch/data/benchmark cmnis
 - `pcl.ipynb`: Trains algorithms (ERM, GroupDRO, etc.) on ColoredMNIST with controlled spurious correlations. Saves metrics to CSV.
 
 ### Analysis Notebook
-- `analysis.ipynb`: Merges CSVs from data/ and generates plots for learning curves, algorithm comparison, and spurious correlation impact.
+- `analysis.ipynb`: Merges CSVs from local folder data/ and generates plots for learning curves, algorithm comparison, and spurious correlation impact.
 
 ## Running Experiments
 
