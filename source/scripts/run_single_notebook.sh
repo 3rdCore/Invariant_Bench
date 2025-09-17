@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=pcl_single_run
-#SBATCH --output=../results/${RESULT_FOLDER}/pcl-%j.out
-#SBATCH --error=../results/${RESULT_FOLDER}/pcl-%j.err
+#SBATCH --output=../results/pcl-%j.out
+#SBATCH --error=../results/pcl-%j.err
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G

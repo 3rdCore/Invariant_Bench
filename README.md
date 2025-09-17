@@ -34,7 +34,7 @@ python scripts/download.py --download --data_path ~/scratch/data/benchmark cmnis
 - `pcl.ipynb`: Trains algorithms (ERM, GroupDRO, etc.) on ColoredMNIST with controlled spurious correlations. Saves metrics to CSV.
 
 ### Analysis Notebook
-- `results/analysis/analysis.ipynb`: Merges CSVs and generates plots for learning curves, algorithm comparison, and spurious correlation impact.
+- `analysis.ipynb`: Merges CSVs from data/ and generates plots for learning curves, algorithm comparison, and spurious correlation impact.
 
 ## Running Experiments
 
