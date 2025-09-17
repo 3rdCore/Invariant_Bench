@@ -9,3 +9,6 @@ nbconvert
 netcal
 pybind11
 torch
+gdown
+transformers
+timm

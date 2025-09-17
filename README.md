@@ -16,7 +16,7 @@ The project is structured around two main notebooks:
 
 ### Installation
 
-First, ensure you have `uv` installed for environment management, and up-to-date package manager.
+First, ensure you have `uv` installed for environment management, and up-to-date package manager. (Not necessary for mila cluster)
 
 ```bash
 pip install uv
@@ -35,10 +35,10 @@ uv pip install -r requirements.txt
 
 ### Downloading Data
 
-The necessary datasets can be downloaded and prepared by running:
+The necessary datasets need to be downloaded and prepared by running:
 
 ```bash
-python -m source.scripts.download --data_path <path_to_your_data_folder> --download
+python scripts/download.py --download --data_path ~/scratch/data/benchmark cmnist
 ```
 
 ## Running Experiments

@@ -13,7 +13,7 @@ import PIL
 import torch
 import torch.utils.data
 import torchvision
-from source import hparams_registry
+from source.utils import hparams_registry
 from source.dataset import datasets
 from source.dataset.fast_dataloader import FastDataLoader, InfiniteDataLoader
 from source.learning import algorithms, early_stopping

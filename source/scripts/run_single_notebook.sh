@@ -1,31 +1,34 @@
-
 #!/bin/bash
-#SBATCH --job-name=pcl_notebook
-#SBATCH --time=24:00:00
+
+#SBATCH --job-name=pcl_single_run
+#SBATCH --output=../results/${RESULT_FOLDER}/pcl-%j.out
+#SBATCH --error=../results/${RESULT_FOLDER}/pcl-%j.err
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --partition=main
+#SBATCH --partition=long
 
-# Folder management logic
+# Timestamp and folder setup
 result_timestamp=$(date +%Y%m%d-%H%M%S)
-RESULT_FOLDER=${result_timestamp}/single_run
+RESULT_FOLDER=${result_timestamp}
 export RESULT_FOLDER=$RESULT_FOLDER
 
-# Output and error files in results folder
-#SBATCH --output=source/results/${RESULT_FOLDER}/pcl-%j.out
-#SBATCH --error=source/results/${RESULT_FOLDER}/pcl-%j.err
-
-# Load necessary modules (adjust based on your environment)
+# Load necessary modules
 module load cuda/11.8
 
-# Change to the project directory
+# Change to project directory
 cd /home/mila/t/tom.marty/invariant_bench/source
 
-source ../../XRM/.venv/bin/activate
+source ../.venv/bin/activate
+
+# Optionally set environment variables for single run
+export CMNIST_ATTR_PROB=0.5
+export CMNIST_SPUR_PROB=0.1
+export SEED=0
 
 # Create results folder
-mkdir -p results/${RESULT_FOLDER}
+mkdir -p ../results/${RESULT_FOLDER}
 
 # Run the notebook conversion command
-jupyter nbconvert --to notebook --execute pcl.ipynb --output results/${RESULT_FOLDER}/executed_notebook.ipynb
+jupyter nbconvert --to notebook --execute pcl.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
