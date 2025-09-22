@@ -1,5 +1,8 @@
 #!/bin/bash
 
+script="contrastive"
+echo "Running script: ${script}.ipynb"
+
 pairs=(
   "0.5 0.01"
   "0.5 0.05"
@@ -7,6 +10,7 @@ pairs=(
   "0.5 0.2"
   "0.5 0.5"
 )
+
 result_timestamp=$(date +%Y%m%d-%H%M%S)
 # Print job submission information
 echo "Results will be saved under results/${result_timestamp}/"
@@ -19,12 +23,12 @@ do
   folder=${result_timestamp}/${attr_prob}_${spur_prob}/${seed}
     
     # Create a temporary sbatch script with a unique name
-    job_script="run_pcl_job_${attr_prob}_${spur_prob}_${seed}.sh"
+    job_script="run_${script}_job_${attr_prob}_${spur_prob}_${seed}.sh"
     cat <<EOF > $job_script
 #!/bin/bash
-#SBATCH --job-name=pcl_${attr_prob}_${spur_prob}_${seed}
-#SBATCH --output=../results/${folder}/pcl-%j.out
-#SBATCH --error=../results/${folder}/pcl-%j.err
+#SBATCH --job-name=${script}_${attr_prob}_${spur_prob}_${seed}
+#SBATCH --output=../results/${folder}/${script}-%j.out
+#SBATCH --error=../results/${folder}/${script}-%j.err
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
@@ -39,7 +43,7 @@ export CMNIST_SPUR_PROB=$spur_prob
 export SEED=$seed
 export RESULT_FOLDER=$folder
 mkdir -p ../results/${RESULT_FOLDER}
-jupyter nbconvert --to notebook --execute pcl.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
+jupyter nbconvert --to notebook --execute ${script}.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
 EOF
 
     # Submit the job

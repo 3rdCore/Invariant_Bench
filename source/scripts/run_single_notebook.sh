@@ -1,8 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name=pcl_single_run
-#SBATCH --output=../results/pcl-%j.out
-#SBATCH --error=../results/pcl-%j.err
+script="contrastive"
+echo "Running script: ${script}.ipynb"
+
+#SBATCH --job-name=${script}_single_run
+#SBATCH --output=../results/${script}-%j.out
+#SBATCH --error=../results/${script}-%j.err
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
@@ -31,4 +34,4 @@ export SEED=0
 mkdir -p ../results/${RESULT_FOLDER}
 
 # Run the notebook conversion command
-jupyter nbconvert --to notebook --execute pcl.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
+jupyter nbconvert --to notebook --execute ${script}.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
