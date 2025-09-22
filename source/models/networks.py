@@ -3,9 +3,42 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models  # https://github.com/pytorch/hub/issues/46
-from source.models import wide_resnet
 from torch.hub import load_state_dict_from_url
 from transformers import AutoModel, BertModel, DistilBertModel, GPT2Model
+
+from source.models import wide_resnet
+
+
+class CNN_Decoder(nn.Module):
+    def __init__(self, latent_dim, input_shape):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.input_shape = input_shape
+
+        # Map latent vector to small feature map
+        self.fc = nn.Linear(latent_dim, 128 * 7 * 7)
+
+        # Upsample to 28x28
+        self.deconv = nn.Sequential(
+            nn.ConvTranspose2d(
+                128, 64, kernel_size=3, stride=2, padding=1, output_padding=1
+            ),  # 7→14
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(
+                64, 32, kernel_size=3, stride=2, padding=1, output_padding=1
+            ),  # 14→28
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, input_shape[0], kernel_size=3, padding=1),
+            nn.Tanh(),
+        )
+
+    def forward(self, z):
+        x = self.fc(z)
+        x = x.view(-1, 128, 7, 7)
+        x = self.deconv(x)
+        return x
 
 
 class Identity(nn.Module):
@@ -159,41 +192,27 @@ class ImportedModel(PretrainedImageModel):
 
 
 class MNIST_CNN(nn.Module):
-
     n_outputs = 128
 
     def __init__(self, input_shape):
         super(MNIST_CNN, self).__init__()
         self.conv1 = nn.Conv2d(input_shape[0], 64, 3, 1, padding=1)
-        self.conv2 = nn.Conv2d(64, 128, 3, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(64, 128, 3, stride=2, padding=1)  # downsample 28→14
         self.conv3 = nn.Conv2d(128, 128, 3, 1, padding=1)
         self.conv4 = nn.Conv2d(128, 128, 3, 1, padding=1)
         self.bn0 = nn.GroupNorm(8, 64)
         self.bn1 = nn.GroupNorm(8, 128)
         self.bn2 = nn.GroupNorm(8, 128)
         self.bn3 = nn.GroupNorm(8, 128)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))  # outputs (batch, 128, 1, 1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.bn0(x)
-
-        x = self.conv2(x)
-        x = F.relu(x)
-        x = self.bn1(x)
-
-        x = self.conv3(x)
-        x = F.relu(x)
-        x = self.bn2(x)
-
-        x = self.conv4(x)
-        x = F.relu(x)
-        x = self.bn3(x)
-
+        x = F.relu(self.bn0(self.conv1(x)))
+        x = F.relu(self.bn1(self.conv2(x)))
+        x = F.relu(self.bn2(self.conv3(x)))
+        x = F.relu(self.bn3(self.conv4(x)))
         x = self.avgpool(x)
         x = x.view(len(x), -1)
-        # x = F.normalize(x, dim=1)
         return x
 
 
@@ -316,7 +335,7 @@ def Featurizer(data_type, input_shape, hparams):
             # Check if we should use SimpleMLP instead of MNIST_CNN
             if hparams.get("image_arch") == "simple_mlp":
                 return SimpleMLP(input_shape)
-            else:
+            elif hparams.get("image_arch") == "mnist_cnn":
                 return MNIST_CNN(input_shape)
         elif input_shape[1:3] == (32, 32):
             return wide_resnet.WideResNet(input_shape, 16, 2, 0.0)
@@ -324,6 +343,8 @@ def Featurizer(data_type, input_shape, hparams):
             # Check if we should use SimpleMLP for 224x224 as well
             if hparams.get("image_arch") == "simple_mlp":
                 return SimpleMLP(input_shape)
+            elif hparams.get("image_arch") == "mnist_cnn":
+                return MNIST_CNN(input_shape)
             elif hparams["image_arch"] == "resnet_sup_in1k":
                 return ResNet(input_shape, hparams, hparams["pretrained"])
             elif hparams["image_arch"] in [

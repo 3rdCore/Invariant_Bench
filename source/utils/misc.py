@@ -428,7 +428,34 @@ def safe_float_env(var, default):
     try:
         return float(val) if val else default
     except ValueError:
+        print(f"There was an error loading environment value {var}")
         return default
+
+
+def load_pretrained_featurizer(algo, size, cmnist_spur_prob, pretrained_dir, device):
+    """
+    Load pretrained featurizer weights for a given algorithm, dataset size, and spur probability.
+    """
+    spur_prob_str = str(cmnist_spur_prob).replace(".", "p")
+    featurizer_path = os.path.join(
+        pretrained_dir, f"featurizer_size{size}_spur{spur_prob_str}.pt"
+    )
+
+    if os.path.exists(featurizer_path):
+        try:
+            featurizer_state_dict = torch.load(featurizer_path, map_location=device)
+            algo.featurizer.load_state_dict(featurizer_state_dict)
+            print(f"[Info] Loaded pretrained featurizer from {featurizer_path}")
+            return True
+        except Exception as e:
+            print(f"[Warning] Failed to load pretrained featurizer: {e}")
+            print("[Warning] Using random initialization instead")
+            return False
+    else:
+        print(
+            f"[Info] No pretrained featurizer found at {featurizer_path}, using random initialization"
+        )
+        return False
 
 
 class ParamDict(OrderedDict):
@@ -506,3 +533,22 @@ class InfiniteDataLoader:
 
     def __len__(self):
         return len(self.dataloader)
+
+
+def find_timestamp_root(path):
+    """Find the root timestamp folder (format: YYYYMMDD-HHMMSS) in the path"""
+    import re
+    import os
+    
+    # Split path and look for timestamp pattern
+    path_parts = path.split(os.sep)
+    timestamp_pattern = r'^\d{8}-\d{6}$'  # YYYYMMDD-HHMMSS format
+    
+    for i, part in enumerate(path_parts):
+        if re.match(timestamp_pattern, part):
+            # Reconstruct path up to and including the timestamp folder
+            root_path = os.sep.join(path_parts[:i+1])
+            return root_path
+    
+    # Fallback: if no timestamp found, use the path as-is
+    return path

@@ -101,9 +101,9 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam("dfr_reg", 0.1, lambda r: 10 ** r.uniform(-2, 0.5))
 
     elif algorithm == "VAE":
-        _hparam("vae_latent_dim", 32, lambda r: int(r.choice([16, 32, 64])))
+        _hparam("vae_latent_dim", 64, lambda r: int(r.choice([16, 32, 64])))
         _hparam("vae_lr", 1e-3, lambda r: 10 ** r.uniform(-4, -2))
-        _hparam("vae_beta", 1, lambda r: r.uniform(0.5, 2.0))
+        _hparam("vae_beta", 0.5, lambda r: r.uniform(0.5, 2.0))
 
     # Dataset-and-algorithm-specific hparam definitions
     # Each block of code below corresponds to exactly one hparam. Avoid nested conditionals
