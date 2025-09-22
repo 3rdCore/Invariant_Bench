@@ -445,6 +445,7 @@ def load_pretrained_featurizer(algo, size, cmnist_spur_prob, pretrained_dir, dev
         try:
             featurizer_state_dict = torch.load(featurizer_path, map_location=device)
             algo.featurizer.load_state_dict(featurizer_state_dict)
+            algo.featurizer.train()
             print(f"[Info] Loaded pretrained featurizer from {featurizer_path}")
             return True
         except Exception as e:
@@ -537,18 +538,18 @@ class InfiniteDataLoader:
 
 def find_timestamp_root(path):
     """Find the root timestamp folder (format: YYYYMMDD-HHMMSS) in the path"""
-    import re
     import os
-    
+    import re
+
     # Split path and look for timestamp pattern
     path_parts = path.split(os.sep)
-    timestamp_pattern = r'^\d{8}-\d{6}$'  # YYYYMMDD-HHMMSS format
-    
+    timestamp_pattern = r"^\d{8}-\d{6}$"  # YYYYMMDD-HHMMSS format
+
     for i, part in enumerate(path_parts):
         if re.match(timestamp_pattern, part):
             # Reconstruct path up to and including the timestamp folder
-            root_path = os.sep.join(path_parts[:i+1])
+            root_path = os.sep.join(path_parts[: i + 1])
             return root_path
-    
+
     # Fallback: if no timestamp found, use the path as-is
     return path
