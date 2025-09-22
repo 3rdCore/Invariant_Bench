@@ -3,11 +3,12 @@ import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import get_scheduler
+
 from source.learning import joint_dro
 from source.learning.optimizers import get_optimizers
 from source.models import networks
 from source.utils.misc import mixup_data
-from transformers import get_scheduler
 
 ALGORITHMS = [
     "ERM",
@@ -183,7 +184,12 @@ class ERM(Algorithm):
         return self.loss(self.predict(x), y).mean()
 
     def update(self, minibatch, step):
-        all_i, all_x, all_y, all_a = minibatch
+        # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+        if len(minibatch) == 5:
+            all_i, all_x, all_y, all_a, all_digit = minibatch
+        else:
+            all_i, all_x, all_y, all_a = minibatch
+
         loss = self._compute_loss(all_i, all_x, all_y, all_a, step)
 
         self.optimizer.zero_grad()
@@ -982,7 +988,11 @@ class AbstractTwoStage(Algorithm):
         self.stage2_model = None  # implement in child classes
 
     def update(self, minibatch, step):
-        all_i, all_x, all_y, all_a = minibatch
+        # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+        if len(minibatch) == 5:
+            all_i, all_x, all_y, all_a, all_digit = minibatch
+        else:
+            all_i, all_x, all_y, all_a = minibatch
 
         if step < self.switch_step:
             self.cur_model = self.stage1_model
@@ -1183,7 +1193,12 @@ class LfF(Algorithm):
         return loss
 
     def update(self, minibatch, step):
-        all_i, all_x, all_y, all_a = minibatch
+        # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+        if len(minibatch) == 5:
+            all_i, all_x, all_y, all_a, all_digit = minibatch
+        else:
+            all_i, all_x, all_y, all_a = minibatch
+
         pred_logits = self.pred_model.predict(all_x)
         biased_logits = self.biased_network(all_x)
         loss_gce = self.GCE2(biased_logits, all_y)
@@ -1268,7 +1283,12 @@ class XRM(ERM):  # TODO double check the code
         self.y_tr_dynamic[i] = flip * y_ho + (1 - flip) * y[i].cpu()
 
     def update(self, minibatch, step):
-        all_i, all_x, all_y, all_a = minibatch
+        # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+        if len(minibatch) == 5:
+            all_i, all_x, all_y, all_a, all_digit = minibatch
+        else:
+            all_i, all_x, all_y, all_a = minibatch
+
         x = all_x.to(next(self.network.parameters()).device)
         y = all_y.to(next(self.network.parameters()).device)
         if self.y_tr_dynamic is None:
@@ -1502,3 +1522,123 @@ class LISA(ERM):
         mixed_y_float = mixed_y.type(torch.FloatTensor)
         loss_value = F.cross_entropy(predictions, mixed_y_float.to(predictions.device))
         return loss_value
+
+
+class VAE(Algorithm):
+    """Variational Autoencoder (VAE) task, used for self-supervised pretraining"""
+
+    def __init__(
+        self,
+        data_type,
+        input_shape,
+        num_classes,
+        num_attributes,
+        num_examples,
+        hparams,
+        grp_sizes=None,
+    ):
+        super(VAE, self).__init__(
+            data_type,
+            input_shape,
+            num_classes,
+            num_attributes,
+            num_examples,
+            hparams,
+            grp_sizes,
+        )
+        self.latent_dim = hparams.get("vae_latent_dim", 32)
+        self.featurizer = networks.Featurizer(data_type, input_shape, hparams)
+        feat_dim = self.featurizer.n_outputs
+        self.encoder_mu = nn.Linear(feat_dim, self.latent_dim)
+        self.encoder_logvar = nn.Linear(feat_dim, self.latent_dim)
+        self.decoder = networks.CNN_Decoder(self.latent_dim, input_shape)
+
+        self._init_model()
+        # self.print_parameter_summary()
+
+    def print_parameter_summary(self):
+        """Print a summary of parameters for each VAE component."""
+        print("--- VAE Parameter Summary ---")
+        print(f"Featurizer: {sum(p.numel() for p in self.featurizer.parameters()):,}")
+        print(f"Encoder (mu): {sum(p.numel() for p in self.encoder_mu.parameters()):,}")
+        print(
+            f"Encoder (logvar): {sum(p.numel() for p in self.encoder_logvar.parameters()):,}"
+        )
+        print(f"Decoder: {sum(p.numel() for p in self.decoder.parameters()):,}")
+        print(f"Total: {self.num_parameters():,}")
+        print("-----------------------------")
+
+    def num_parameters(self):
+        """Return the total number of parameters in the VAE."""
+        return sum(p.numel() for p in self.parameters())
+
+    def _init_model(self):
+        # Initialize weights for encoder and decoder
+        for m in self.featurizer.modules():
+            if hasattr(m, "reset_parameters"):
+                m.reset_parameters()
+        for m in [self.encoder_mu, self.encoder_logvar, self.decoder]:
+            for layer in m.modules():
+                if hasattr(layer, "reset_parameters"):
+                    layer.reset_parameters()
+
+        # Set optimizer here
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.hparams.get("vae_lr", 1e-3)
+        )
+
+    def encode(self, x):
+        h = self.featurizer(x)
+        mu = self.encoder_mu(h)
+        logvar = self.encoder_logvar(h)
+        return mu, logvar
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def decode(self, z):
+        recon = self.decoder(z)
+        return recon
+
+    def forward(self, x):
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        recon = self.decode(z)
+        return recon, mu, logvar
+
+    def _compute_loss(self, i, x, y, a, step):
+        recon, mu, logvar = self.forward(x)
+        recon_loss = F.mse_loss(recon, x, reduction="sum")
+        kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        return recon_loss + self.hparams.get("vae_beta", 1.0) * kld
+
+    def update(self, minibatch, step):
+        # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+        if len(minibatch) == 5:
+            _, x, _, _, _ = minibatch
+        else:
+            _, x, _, _ = minibatch
+
+        loss = self._compute_loss(None, x, None, None, step)
+        self.optimizer.zero_grad()
+        loss.backward()
+        # Add gradient clipping to prevent exploding gradients
+        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
+        self.optimizer.step()
+        return {"loss": loss.item()}
+
+    def return_feats(self, x):
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        return z
+
+    def predict(self, x, y=None, return_loss: bool = False):
+        recon, mu, logvar = self.forward(x)
+        if return_loss:
+            recon_loss = F.mse_loss(recon, x, reduction="sum")
+            kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+            loss = recon_loss + self.hparams.get("vae_beta", 1.0) * kld
+            return recon, loss
+        return recon

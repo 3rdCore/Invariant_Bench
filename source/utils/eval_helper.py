@@ -22,7 +22,13 @@ def predict_on_set(algorithm, loader, device):
 
     algorithm.eval()
     with torch.no_grad():
-        for _, x, y, a in loader:
+        for batch in loader:
+            # Handle both old format (i, x, y, a) and new format (i, x, y, a, digit)
+            if len(batch) == 5:
+                _, x, y, a, digit = batch
+            else:
+                _, x, y, a = batch
+                
             p = algorithm.predict(x.to(device))
             if p.squeeze().ndim == 1:
                 p = torch.sigmoid(p).detach().cpu().numpy()

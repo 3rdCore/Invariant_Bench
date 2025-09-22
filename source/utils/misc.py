@@ -64,7 +64,7 @@ def build_group_index(ds):
     else:
         for i in range(len(ds)):
             try:
-                _, _, y, a = ds[i]
+                _, _, y, a, _ = ds[i]
                 groups[(int(y), int(a))].append(i)
             except Exception:
                 pass

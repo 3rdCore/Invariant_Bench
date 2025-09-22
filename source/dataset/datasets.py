@@ -170,6 +170,9 @@ class CMNIST(SubpopDataset):
             )  # Default to 224 if not specified
         self.INPUT_SHAPE = (3, input_size, input_size)
 
+        image_arch = hparams.get("image_arch", "").lower()
+        use_resnet_normalization = "resnet" in image_arch
+
         root = Path(data_path) / "cmnist"
         mnist = datasets.MNIST(root, train=True)
         X, y = mnist.data, mnist.targets
@@ -185,6 +188,7 @@ class CMNIST(SubpopDataset):
 
         rng = np.random.default_rng(666)
 
+        self.original_digits = y.numpy()  # Store original MNIST digits (0-9)
         self.binary_label = np.bitwise_xor(
             y >= 5, (rng.random(len(y)) < hparams["cmnist_flip_prob"])
         ).numpy()
@@ -232,6 +236,7 @@ class CMNIST(SubpopDataset):
         self.x = torch.from_numpy(self.imgs).float() / 255.0
         self.y = self.binary_label
         self.a = self.color
+        self.digits = self.original_digits  # Store original digits for access
 
         # Update INPUT_SHAPE based on input_size parameter
         self.INPUT_SHAPE = (3, input_size, input_size)
@@ -246,14 +251,26 @@ class CMNIST(SubpopDataset):
                     ),
                 ]
             )
-        else:
-            # For larger sizes - resize and use ImageNet normalization
+        elif use_resnet_normalization:
+            # For ResNet-style models - use ImageNet normalization
             self.transform_ = transforms.Compose(
                 [
                     transforms.Resize((input_size, input_size)),
                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ]
             )
+        else:
+            # For larger sizes - resize and use ImageNet normalization
+            mean = self.x.mean(dim=[0, 2, 3]).tolist()
+            std = self.x.std(dim=[0, 2, 3]).tolist()
+            std[2] = 1.0
+            self.transform_ = transforms.Compose(
+                [
+                    transforms.Resize((input_size, input_size)),
+                    transforms.Normalize(mean, std),
+                ]
+            )
+
         self._count_groups()
 
         if subsample_type is not None:
@@ -274,6 +291,15 @@ class CMNIST(SubpopDataset):
         self.imgs = self.imgs[idxs]
         self.color = self.color[idxs]
         self.binary_label = self.binary_label[idxs]
+        self.original_digits = self.original_digits[idxs]
+
+    def __getitem__(self, index):
+        i = self.idx[index]
+        x = self.transform(self.x[i])
+        y = torch.tensor(self.y[i], dtype=torch.long)
+        a = torch.tensor(self.a[i], dtype=torch.long)
+        digit = torch.tensor(self.digits[i], dtype=torch.long)
+        return i, x, y, a, digit
 
     def transform(self, x):
         return self.transform_(x)
