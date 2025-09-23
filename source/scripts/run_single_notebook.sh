@@ -1,8 +1,4 @@
 #!/bin/bash
-
-script="contrastive"
-echo "Running script: ${script}.ipynb"
-
 #SBATCH --job-name=${script}_single_run
 #SBATCH --output=../results/${script}-%j.out
 #SBATCH --error=../results/${script}-%j.err
@@ -11,6 +7,12 @@ echo "Running script: ${script}.ipynb"
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=long
+
+script="pcl"  # Options: "contrastive", "pcl", "analysis"
+load_pretrained="False"  # Set to "True" to enable pretrained models
+
+echo "Running script: ${script}.ipynb (hardcoded)"
+
 
 # Timestamp and folder setup
 result_timestamp=$(date +%Y%m%d-%H%M%S)
@@ -29,9 +31,10 @@ source ../.venv/bin/activate
 export CMNIST_ATTR_PROB=0.5
 export CMNIST_SPUR_PROB=0.1
 export SEED=0
+export LOAD_PRETRAINED=$load_pretrained
 
 # Create results folder
 mkdir -p ../results/${RESULT_FOLDER}
 
 # Run the notebook conversion command
-jupyter nbconvert --to notebook --execute ${script}.ipynb --output ../results/${RESULT_FOLDER}/executed_notebook.ipynb
+jupyter nbconvert --to notebook --execute ${script}.ipynb --output-dir ../results/${RESULT_FOLDER} --output executed_${script}_notebook.ipynb
